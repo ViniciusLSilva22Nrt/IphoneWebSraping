@@ -79,17 +79,19 @@ def get_max_price(conn):
     #dois elementos na query = dois result
     return result if result else (None, None)
 
-def send_telegram_massage(text):
-    bot.send_message(chat_id = CHAT_ID, text = text)
+async def send_telegram_massage(text):
+    await bot.send_message(chat_id = CHAT_ID, text = text)
 
-if __name__ == "__main__":  
+async def main():
 
+    #configurando banco de dados
     conn = create_connection()
     setup_database(conn)
 
     df=pd.DataFrame()
 
     while True:
+        #faz a requisição e parseia a página
         page_content = fetch_page()
         product_info = parse_page(page_content)
 
@@ -99,17 +101,26 @@ if __name__ == "__main__":
             continue
         
         current_price = product_info['new_price']
+
+        #obtem o maior preço já salvo
         max_price, max_timestamp = get_max_price(conn)
         
         if max_price is None or current_price > max_price:
             print(f"Preço maior detectado: {current_price}") 
-            send_telegram_massage(f"Preço maior detectado: {current_price}")
+            await send_telegram_massage(f"COMPRAR AGORA: {current_price}")
             max_price = current_price
             max_timestamp = product_info['timestamp']
         else:
             print(f"O maior preço registrado é {max_price}")
-            send_telegram_massage(f"O maior preço registrado é {max_price} em {max_timestamp}")
+            await send_telegram_massage(f"O preço não alterou... espere mais um pouco{max_price} esse preço foi em {max_timestamp}")
 
+            #salva os dados no banco de dados SQLITE
         save_to_database(conn, product_info)
         print("Dados salvos no banco de dados", product_info)
-        time.sleep(15)
+        
+        #aguarda os segundos antes da próxima execução
+        await asyncio.sleep(15)
+    #fecha 
+    conn.close()
+
+asyncio.run(main())
